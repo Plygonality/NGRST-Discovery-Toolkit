@@ -1,0 +1,20 @@
+# %ECSV 1.0
+# ---
+# datatype:
+# - {name: source_id, datatype: string}
+# - {name: kind, datatype: string}
+# - {name: x, datatype: float64}
+# - {name: y, datatype: float64}
+# - {name: ra, datatype: float64}
+# - {name: dec, datatype: float64}
+# schema: astropy-2.0
+source_id kind x y ra dec
+UNK-1 unknown 48.0 210.0 150.0024306510844 2.0025208315312155
+UNK-2 unknown 70.0 70.0 150.00175801349687 1.9982430546162444
+UNK-3 unknown 188.0 48.0 149.9981502648178 1.9975708322946595
+UNK-4 unknown 210.0 188.0 149.9974776272668 2.001848609172176
+REF-1 known 60.0 150.0 150.002063758049 2.000687498703181
+REF-2 known 110.0 48.0 150.00053504736698 1.9975708332477584
+REF-3 known 150.0 170.0 149.9993120803939 2.001298610966754
+REF-4 known 200.0 110.0 149.99778337263584 1.9994652762826979
+DQ-1 dq 30.0 30.0 150.00298097718533 1.9970208306353516

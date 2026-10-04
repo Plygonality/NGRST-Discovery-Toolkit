@@ -6,6 +6,7 @@ scikit-learn==1.9.1
 astropy==8.0.1
 astroquery==0.4.11
 photutils==3.0.0
+scikit-image==0.26.0
 asdf==5.4.0
 pyarrow==25.0.1
 roman-datamodels==1.1.0

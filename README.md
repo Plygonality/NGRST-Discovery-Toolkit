@@ -1,20 +1,8 @@
 # NGRST Discovery
 
-A Python research toolkit for detecting, ranking, and investigating unusual astronomical sources in Nancy Grace Roman Space Telescope data.
+A Python research toolkit that turns one Roman-shaped exposure into a sky catalog of known and unknown sources.
 
-The project is a modular pipeline for:
-
-- Roman ASDF ingestion
-- source detection
-- photometry
-- morphology analysis
-- anomaly detection
-- candidate ranking
-- catalog cross-matching
-- multi-filter analysis
-- time-domain searches
-
-The current prototype uses synthetic observations to validate the analysis pipeline before Roman science data are used.
+Roman calibration stays in `romancal`. This loop starts at a Level 2 rate image or a Level 3 coadd and treats a Level 4 catalog as a comparison table. Science imaging from commissioning is not the input. The committed fixture is Roman-shaped and offline.
 
 ## Install
 
@@ -46,96 +34,57 @@ python -c "import numpy, scipy, pandas, matplotlib, sklearn, astropy, astroquery
 
 PyCharm setup for a Windows workstation is in [docs/NGRST_Discovery_Setup_Guide.md](docs/NGRST_Discovery_Setup_Guide.md).
 
-## Quick start
+## Discovery loop
 
-Create a 1024×1024 synthetic scene with ordinary stars and a few deliberately unusual objects:
+One local command reads a Roman-shaped ASDF, detects sources in the error array, deblends them, attaches RA and Dec from the WCS, and cross-matches an offline reference catalog. Unknowns are ranked first, then by match residual, then by local SNR. `anomaly_score` is a morphology column from an isolation forest. It is not the sort key, and it is not a discovery by itself.
+
+```bash
+python -m ngrst discover tests/fixtures/detector_fixture.asdf --top 8
+```
+
+Outputs, both gitignored:
+
+```text
+data/processed/detector_fixture_catalog.parquet
+data/candidates/detector_fixture/001_object_….png
+```
+
+A candidate row has RA, Dec, exposure ID, filter, local SNR, reference separation, and a known-versus-unknown mark. Rows without a WCS finish as `pixel_only` and `unclassified`. They are not marked unknown.
+
+The offline reference is `tests/fixtures/reference_catalog.ecsv`. Pass `--reference` to use another local ECSV or parquet file. `--crossmatch-online` is off unless you set it. SIMBAD is not queried during a normal run.
+
+Optional, and off by default. This is the only path that contacts MAST. It asks for one Roman exposure in one filter and one cone, prefers a Level 2 product, downloads that one file into `data/raw/`, and then runs the local loop. An empty result exits without scanning the archive.
+
+```bash
+python -m ngrst discover --mast --filter F158 --ra 150.0 --dec 2.0 --radius 0.05
+```
+
+What this loop does not do: live survey mining, color outliers, or time-domain measurements.
+
+The older pixel demo is still available. It has no WCS, so every row stays unclassified:
 
 ```bash
 python src/make_demo.py
+python -m ngrst discover data/raw/demo_scene.npz --top 10
 ```
-
-Run the discovery engine:
-
-```bash
-python src/roman_toolkit.py data/raw/demo_scene.npz
-```
-
-Outputs:
-
-```text
-data/processed/demo_scene_catalog.csv
-data/candidates/demo_scene/001_object_….png
-```
-
-The catalog is ranked by `anomaly_score`. A high score means the source is statistically unusual in this image. It does not by itself mean a discovery.
-
-Export fewer cutouts with `--top`:
-
-```bash
-python src/roman_toolkit.py data/raw/demo_scene.npz --top 10
-```
-
-## Real Roman data
-
-Place a calibrated Roman WFI file in `data/raw/`, then run:
-
-```bash
-python src/roman_toolkit.py "data/raw/FILE_NAME.asdf"
-```
-
-The loader tries `roman_datamodels` first and falls back to a generic ASDF read when that open fails. Large Roman science products stay outside Git.
-
-## Pipeline
-
-```text
-Roman L2/L3 data or synthetic .npz
-        ↓
-roman_datamodels / ASDF
-        ↓
-quality masking
-        ↓
-background modelling
-        ↓
-source detection
-        ↓
-morphological measurements
-        ↓
-feature vectors
-        ↓
-Isolation Forest
-        ↓
-anomaly ranking
-        ↓
-CSV catalog + candidate PNGs
-```
-
-Catalog columns:
-
-```text
-label
-x_centroid
-y_centroid
-area
-segment_flux
-max_value
-eccentricity
-semimajor_axis
-semiminor_axis
-orientation
-anomaly_score
-```
-
-Anomaly features are log flux, log area, eccentricity, axis ratio, and peak fraction.
 
 ## Project layout
 
 ```text
 NGRST-Discovery-Toolkit/
 ├── src/
+│   ├── ngrst.py
 │   ├── make_demo.py
 │   └── roman_toolkit.py
-├── notebooks/
 ├── tests/
+│   ├── fixtures/
+│   │   ├── build_fixture.py
+│   │   ├── detector_fixture.asdf
+│   │   ├── reference_catalog.ecsv
+│   │   └── truth.ecsv
+│   ├── test_discovery.py
+│   └── test_discovery_sky.py
+├── notebooks/
 ├── docs/
 ├── data/
 │   ├── raw/
@@ -156,26 +105,7 @@ python -m pip install pytest
 python -m pytest
 ```
 
-## Roadmap
-
-Version 0.1, this build:
-
-- synthetic observations
-- source detection
-- photometry
-- morphology
-- anomaly scoring
-- candidate cutouts
-
-Version 0.2: Roman WCS, RA/Dec, and cross-matches to SIMBAD, Gaia, Pan-STARRS, 2MASS, WISE, and MAST.
-
-Version 0.3: multi-filter colors (F062 through F213) and spectral outliers.
-
-Version 0.4: time-domain changes in brightness, position, color, and morphology.
-
-Version 0.5: automated MAST queries, download, analysis, and stored rankings.
-
-The next milestone is coordinates and known-versus-unknown classification, not more machine learning.
+The tests use the committed fixture and do not call MAST, Gaia, or SIMBAD.
 
 ## License
 

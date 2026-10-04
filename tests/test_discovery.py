@@ -24,7 +24,7 @@ PLANTED = (
 
 def test_load_image_rejects_unknown_suffix(tmp_path):
     with pytest.raises(ValueError, match="Unsupported file format"):
-        roman_toolkit.load_image(tmp_path / "scene.fits")
+        roman_toolkit.load_image(tmp_path / "scene.txt")
 
 
 def test_demo_pipeline_ranks_planted_outliers(tmp_path, monkeypatch):
@@ -51,30 +51,25 @@ def test_demo_pipeline_ranks_planted_outliers(tmp_path, monkeypatch):
 
     roman_toolkit.run_pipeline(generated, top=10)
 
-    catalog = pd.read_csv(processed / "demo_scene_catalog.csv")
-    assert list(catalog.columns) == [
-        "label",
-        "x_centroid",
-        "y_centroid",
-        "area",
-        "segment_flux",
-        "max_value",
-        "eccentricity",
-        "semimajor_axis",
-        "semiminor_axis",
-        "orientation",
-        "anomaly_score",
-    ]
+    catalog = pd.read_parquet(processed / "demo_scene_catalog.parquet")
+    assert list(catalog.columns[: len(roman_toolkit.CATALOG_COLUMNS)]) == (
+        roman_toolkit.CATALOG_COLUMNS
+    )
     assert len(catalog) > 100
+    assert catalog["coord_status"].eq("pixel_only").all()
+    assert catalog["match_status"].eq("unclassified").all()
+    assert catalog["ra"].isna().all()
+    assert catalog["dec"].isna().all()
+    assert catalog["detect_status"].eq("rms_fallback").all()
     scored = catalog["anomaly_score"].dropna()
-    assert scored.is_monotonic_decreasing
     assert len(scored) == len(catalog)
 
     images = sorted((candidates / "demo_scene").glob("*.png"))
     assert len(images) == 10
     assert images[0].name.startswith("001_object_")
 
-    top = catalog.head(15)
+    by_anomaly = catalog.sort_values("anomaly_score", ascending=False)
+    top = by_anomaly.head(15)
     found = 0
     for x, y in PLANTED:
         nearby = (
@@ -94,7 +89,10 @@ def test_generic_asdf_fallback(tmp_path):
     with asdf.AsdfFile({"roman": {"data": image, "dq": dq}}) as handle:
         handle.write_to(path)
 
-    data, loaded_dq = roman_toolkit.load_image(path)
-    assert data.shape == (32, 32)
-    assert data[1, 1] == 10.0
-    assert loaded_dq[0, 0] == 1
+    frame = roman_toolkit.load_image(path)
+    assert isinstance(frame, roman_toolkit.Frame)
+    assert frame.source == "asdf"
+    assert frame.wcs is None
+    assert frame.data.shape == (32, 32)
+    assert frame.data[1, 1] == 10.0
+    assert frame.dq[0, 0] == 1
